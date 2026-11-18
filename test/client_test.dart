@@ -128,6 +128,26 @@ void main() {
       expect(calls, 1);
     });
 
+    test('concurrent requests share one token fetch', () async {
+      var calls = 0;
+      final client =
+          build((_) => json(ok({})), token: () async => 'tok${++calls}');
+      await Future.wait([client.getCustomerInfo(), client.getOfferings()]);
+      expect(calls, 1);
+    });
+
+    test('concurrent TOKEN_INVALID causes one refresh', () async {
+      var calls = 0;
+      final client = build(
+        (request) => request.headers['Authorization'] == 'Bearer tok1'
+            ? json(err('TOKEN_INVALID'), 401)
+            : json(ok({})),
+        token: () async => 'tok${++calls}',
+      );
+      await Future.wait([client.getCustomerInfo(), client.getOfferings()]);
+      expect(calls, 2);
+    });
+
     test('refreshes once on 401 TOKEN_INVALID and retries', () async {
       var calls = 0;
       final client = build(

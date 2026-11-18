@@ -36,6 +36,8 @@ final offerings = await client.getOfferings();
 await client.setAttributes({'plan': 'beta', 'old_key': null});
 ```
 
+`getCustomerInfo` returns 404 `CUSTOMER_NOT_FOUND` for a customer with no purchases, promotions or attributes yet.
+
 Responses are the API's `data` objects as `Map<String, dynamic>` with snake_case keys.
 
 ## Errors

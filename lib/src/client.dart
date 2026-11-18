@@ -13,6 +13,7 @@ class TinkerClient {
     String? baseUrl,
     http.Client? httpClient,
   })  : baseUrl = _resolveBaseUrl(publicKey, baseUrl),
+        _ownsHttp = httpClient == null,
         _http = httpClient ?? http.Client();
 
   static const productionBaseUrl = 'https://api.tinkerpayments.com';
@@ -23,7 +24,9 @@ class TinkerClient {
   final Future<String> Function() getCustomerToken;
   final String baseUrl;
   final http.Client _http;
+  final bool _ownsHttp;
   String? _token;
+  Future<String>? _pending;
 
   Future<JsonMap> getCustomerInfo() => _request('GET', 'client/customer');
 
@@ -38,20 +41,44 @@ class TinkerClient {
   Future<JsonMap> setAttributes(Map<String, String?> attributes) =>
       _request('POST', 'client/attributes', {'attributes': attributes});
 
-  void close() => _http.close();
+  void close() {
+    if (_ownsHttp) _http.close();
+  }
 
-  Future<JsonMap> _request(String method, String path, [JsonMap? body]) async {
+  Future<String> _currentToken() async {
+    final token = _token;
+    if (token != null) return token;
     try {
-      return await _send(method, path, body);
-    } on ApiException catch (error) {
-      if (error.status != 401 || error.errorCode != 'TOKEN_INVALID') rethrow;
-      _token = null;
-      return _send(method, path, body);
+      return await (_pending ??= _fetchToken());
+    } catch (error) {
+      throw NetworkException(
+          'Failed to communicate with Tinker API: $error', error);
     }
   }
 
-  Future<JsonMap> _send(String method, String path, JsonMap? body) async {
-    final token = _token ??= await getCustomerToken();
+  Future<String> _fetchToken() async {
+    try {
+      final token = await Future.sync(getCustomerToken);
+      _token = token;
+      return token;
+    } finally {
+      _pending = null;
+    }
+  }
+
+  Future<JsonMap> _request(String method, String path, [JsonMap? body]) async {
+    final token = await _currentToken();
+    try {
+      return await _send(method, path, body, token);
+    } on ApiException catch (error) {
+      if (error.status != 401 || error.errorCode != 'TOKEN_INVALID') rethrow;
+      if (_token == token) _token = null;
+      return _send(method, path, body, await _currentToken());
+    }
+  }
+
+  Future<JsonMap> _send(
+      String method, String path, JsonMap? body, String token) async {
     final request = http.Request(method, Uri.parse('$baseUrl/$path'))
       ..headers.addAll({
         'X-Public-Key': publicKey,
