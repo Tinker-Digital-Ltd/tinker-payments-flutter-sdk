@@ -92,10 +92,10 @@ void main() {
     });
 
     test('getOfferings', () async {
-      final client = build(
-          (_) => json(ok({'current_offering_id': 'default', 'offerings': []})));
+      final client = build((_) => json(
+          ok({'current_offering_identifier': 'default', 'offerings': []})));
       final offerings = await client.getOfferings();
-      expect(offerings['current_offering_id'], 'default');
+      expect(offerings['current_offering_identifier'], 'default');
       expect(seen.single.url.path, '/v1/client/offerings');
     });
 
@@ -262,5 +262,19 @@ void main() {
       await expectLater(
           client.getCustomerInfo(), throwsA(isA<NetworkException>()));
     });
+  });
+
+  test('rejects empty token and non-pk_ key', () async {
+    final client = TinkerClient(
+      publicKey: 'pk_live_abc',
+      getCustomerToken: () async => '',
+      httpClient: MockClient((_) async => http.Response('{}', 200)),
+    );
+    await expectLater(
+        client.getCustomerInfo(), throwsA(isA<TinkerException>()));
+    expect(
+        () => TinkerClient(
+            publicKey: 'sk_live_abc', getCustomerToken: () async => 't'),
+        throwsA(isA<TinkerException>()));
   });
 }

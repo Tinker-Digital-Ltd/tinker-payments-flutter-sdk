@@ -59,6 +59,10 @@ class TinkerClient {
   Future<String> _fetchToken() async {
     try {
       final token = await Future.sync(getCustomerToken);
+      if (token.isEmpty) {
+        throw TinkerException(
+            'Customer token must not be empty', 'INVALID_TOKEN');
+      }
       _token = token;
       return token;
     } finally {
@@ -148,6 +152,10 @@ class TinkerClient {
       value == null || value == '' || value == false ? null : value.toString();
 
   static String _resolveBaseUrl(String publicKey, String? override) {
+    if (!publicKey.startsWith('pk_')) {
+      throw TinkerException(
+          'publicKey must start with pk_', 'INVALID_PUBLIC_KEY');
+    }
     var url = override == null || override.trim().isEmpty
         ? (publicKey.startsWith('pk_test_')
             ? sandboxBaseUrl
