@@ -36,9 +36,19 @@ final offerings = await client.getOfferings();
 await client.setAttributes({'plan': 'beta', 'old_key': null});
 ```
 
+`setAttributes` rejects keys starting with `$` with 403 `RESERVED_ATTRIBUTE`; those are set from the server only.
+
 `getCustomerInfo` returns 404 `CUSTOMER_NOT_FOUND` for a customer with no purchases, promotions or attributes yet.
 
 Responses are the API's `data` objects as `Map<String, dynamic>` with snake_case keys.
+
+## Hosted paywall
+
+```dart
+final url = await client.paywallUrl(returnUrl: 'https://app.example.com/after-purchase', offering: 'default');
+```
+
+Open `url` in a browser or web view. It carries `pk`, the current customer token, `return_url` and the optional `offering` (omit it for the current offering), all URL-encoded. The hosted page only accepts an `https` return URL (or `http://localhost`). The customer comes back with `package`, `offering`, `product_id` and `billing_period` appended. Pass `paywallBaseUrl` to override the site origin (default `https://tinkerpayments.com`, path `/paywall`).
 
 ## Errors
 

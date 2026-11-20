@@ -118,6 +118,38 @@ void main() {
     });
   });
 
+  group('paywall url', () {
+    test('encodes the hosted paywall parameters', () async {
+      final client = build((_) => json(ok({})));
+      final url = Uri.parse(await client.paywallUrl(
+          returnUrl: 'https://app.test/back?a=1&b=2', offering: 'big deal'));
+      expect('${url.origin}${url.path}', 'https://tinkerpayments.com/paywall');
+      expect(url.queryParameters, {
+        'pk': 'pk_live_abc',
+        'token': 'tok1',
+        'return_url': 'https://app.test/back?a=1&b=2',
+        'offering': 'big deal',
+      });
+      expect(seen, isEmpty);
+      final bare =
+          Uri.parse(await client.paywallUrl(returnUrl: 'https://x.test'));
+      expect(bare.queryParameters.containsKey('offering'), isFalse);
+    });
+
+    test('paywallBaseUrl overrides the site origin', () async {
+      final client = TinkerClient(
+        publicKey: 'pk_live_abc',
+        paywallBaseUrl: 'http://localhost:3000/',
+        getCustomerToken: () async => 't',
+      );
+      expect(
+          await client.paywallUrl(returnUrl: 'http://localhost:5173'),
+          startsWith(
+              'http://localhost:3000/paywall?pk=pk_live_abc&token=t&return_url=http%3A%2F%2Flocalhost%3A5173'));
+      client.close();
+    });
+  });
+
   group('token', () {
     test('is cached across requests', () async {
       var calls = 0;

@@ -11,18 +11,22 @@ class TinkerClient {
     required this.publicKey,
     required this.getCustomerToken,
     String? baseUrl,
+    String? paywallBaseUrl,
     http.Client? httpClient,
   })  : baseUrl = _resolveBaseUrl(publicKey, baseUrl),
+        paywallBaseUrl = _resolvePaywallBaseUrl(paywallBaseUrl),
         _ownsHttp = httpClient == null,
         _http = httpClient ?? http.Client();
 
   static const productionBaseUrl = 'https://api.tinkerpayments.com';
   static const sandboxBaseUrl = 'https://sandbox-api.tinkerpayments.com';
+  static const defaultPaywallBaseUrl = 'https://tinkerpayments.com';
   static const _apiVersionPath = '/v1';
 
   final String publicKey;
   final Future<String> Function() getCustomerToken;
   final String baseUrl;
+  final String paywallBaseUrl;
   final http.Client _http;
   final bool _ownsHttp;
   String? _token;
@@ -40,6 +44,17 @@ class TinkerClient {
 
   Future<JsonMap> setAttributes(Map<String, String?> attributes) =>
       _request('POST', 'client/attributes', {'attributes': attributes});
+
+  Future<String> paywallUrl(
+      {required String returnUrl, String? offering}) async {
+    final token = await _currentToken();
+    return Uri.parse('$paywallBaseUrl/paywall').replace(queryParameters: {
+      'pk': publicKey,
+      'token': token,
+      'return_url': returnUrl,
+      if (offering != null && offering.isNotEmpty) 'offering': offering,
+    }).toString();
+  }
 
   void close() {
     if (_ownsHttp) _http.close();
@@ -164,4 +179,10 @@ class TinkerClient {
     url = url.replaceFirst(RegExp(r'/+$'), '');
     return url.endsWith(_apiVersionPath) ? url : '$url$_apiVersionPath';
   }
+
+  static String _resolvePaywallBaseUrl(String? override) =>
+      (override == null || override.trim().isEmpty
+              ? defaultPaywallBaseUrl
+              : override)
+          .replaceFirst(RegExp(r'/+$'), '');
 }
